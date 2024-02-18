@@ -1037,12 +1037,14 @@ bool GSDeviceMTL::Create()
 	// FS Triangle Pipelines
 	pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(GSTexture::Format::Color);
 	m_hdr_resolve_pipeline = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_hdr_resolve"), @"HDR Resolve");
+	m_hdr_rta_resolve_pipeline = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_hdr_rta_resolve"), @"HDR RTA Resolve");
 	m_fxaa_pipeline = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_fxaa"), @"fxaa");
 	m_shadeboost_pipeline = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_shadeboost"), @"shadeboost");
 	m_clut_pipeline[0] = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_convert_clut_4"), @"4-bit CLUT Update");
 	m_clut_pipeline[1] = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_convert_clut_8"), @"8-bit CLUT Update");
 	pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(GSTexture::Format::HDRColor);
 	m_hdr_init_pipeline = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_hdr_init"), @"HDR Init");
+	m_hdr_rta_init_pipeline = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_hdr_rta_init"), @"HDR RTA Init");
 	m_hdr_clear_pipeline = MakePipeline(pdesc, fs_triangle, LoadShader(@"ps_clear"), @"HDR Clear");
 	pdesc.colorAttachments[0].pixelFormat = MTLPixelFormatInvalid;
 	pdesc.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
@@ -2145,8 +2147,8 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 		switch (config.rt->GetState())
 		{
 			case GSTexture::State::Dirty:
-				BeginRenderPass(@"HDR Init", hdr_rt, MTLLoadActionDontCare, nullptr, MTLLoadActionDontCare);
-				RenderCopy(config.rt, m_hdr_init_pipeline, config.drawarea);
+				BeginRenderPass(config.ps.hdr == 2 ? @"HDR RTA Init" : @"HDR Init", hdr_rt, MTLLoadActionDontCare, nullptr, MTLLoadActionDontCare);
+				RenderCopy(config.rt, config.ps.hdr == 2 ? : m_hdr_rta_init_pipeline : m_hdr_init_pipeline, config.drawarea);
 				g_perfmon.Put(GSPerfMon::TextureCopies, 1);
 				break;
 
@@ -2210,8 +2212,8 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 
 	if (hdr_rt)
 	{
-		BeginRenderPass(@"HDR Resolve", config.rt, MTLLoadActionLoad, nullptr, MTLLoadActionDontCare);
-		RenderCopy(hdr_rt, m_hdr_resolve_pipeline, config.drawarea);
+		BeginRenderPass(config.ps.hdr == 2 ? @"HDR RTA Resolve" : @"HDR Resolve", config.rt, MTLLoadActionLoad, nullptr, MTLLoadActionDontCare);
+		RenderCopy(hdr_rt, config.ps.hdr == 2 ? m_hdr_rta_resolve_pipeline : m_hdr_resolve_pipeline, config.drawarea);
 		g_perfmon.Put(GSPerfMon::TextureCopies, 1);
 
 		Recycle(hdr_rt);

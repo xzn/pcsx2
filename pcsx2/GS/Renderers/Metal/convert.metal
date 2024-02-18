@@ -110,10 +110,22 @@ fragment float4 ps_hdr_init(float4 p [[position]], DirectReadTextureIn<float> te
 	return float4(round(in.rgb * 255.f) / 65535.f, in.a);
 }
 
+fragment float4 ps_hdr_rta_init(float4 p [[position]], DirectReadTextureIn<float> tex)
+{
+	float4 in = tex.read(p);
+	return float4(round(in.rgb * 255.f) / 65535.f, trunc(in.a * 255.f + 0.1f) / 128.f);
+}
+
 fragment float4 ps_hdr_resolve(float4 p [[position]], DirectReadTextureIn<float> tex)
 {
 	float4 in = tex.read(p);
 	return float4(float3(uint3(in.rgb * 65535.5f) & 255) / 255.f, in.a);
+}
+
+fragment float4 ps_hdr_rta_resolve(float4 p [[position]], DirectReadTextureIn<float> tex)
+{
+	float4 in = tex.read(p);
+	return float4(float3(uint3(in.rgb * 65535.5f) & 255) / 255.f, (in.a * 128.f) / 255.f);
 }
 
 fragment float4 ps_filter_transparency(ConvertShaderData data [[stage_in]], ConvertPSRes res)

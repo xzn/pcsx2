@@ -2411,9 +2411,9 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		hdr_rt = CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::HDRColor, false);
 		OMSetRenderTargets(hdr_rt, config.ds, &config.scissor);
 
-		GSVector4 dRect(config.drawarea);
+		const GSVector4 dRect(config.drawarea);
 		const GSVector4 sRect = dRect / GSVector4(rtsize.x, rtsize.y).xyxy();
-		StretchRect(config.rt, sRect, hdr_rt, dRect, ShaderConvert::HDR_INIT, false);
+		StretchRect(config.rt, sRect, hdr_rt, dRect, config.ps.hdr == 2 ? ShaderConvert::HDR_RTA_INIT : ShaderConvert::HDR_INIT, false);
 	}
 	else if (config.require_one_barrier && !m_features.texture_barrier)
 	{
@@ -2619,10 +2619,10 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 
 	if (hdr_rt)
 	{
-		GSVector2i size = config.rt->GetSize();
-		GSVector4 dRect(config.drawarea);
+		const GSVector2i size = config.rt->GetSize();
+		const GSVector4 dRect(config.drawarea);
 		const GSVector4 sRect = dRect / GSVector4(size.x, size.y).xyxy();
-		StretchRect(hdr_rt, sRect, config.rt, dRect, ShaderConvert::HDR_RESOLVE, false);
+		StretchRect(hdr_rt, sRect, config.rt, dRect, config.ps.hdr == 2 ? ShaderConvert::HDR_RTA_RESOLVE : ShaderConvert::HDR_RESOLVE, false);
 
 		Recycle(hdr_rt);
 	}

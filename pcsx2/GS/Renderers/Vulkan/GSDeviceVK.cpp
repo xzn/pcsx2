@@ -4016,6 +4016,28 @@ bool GSDeviceVK::CompileConvertPipelines()
 				}
 			}
 		}
+		else if (i == ShaderConvert::HDR_RTA_INIT || i == ShaderConvert::HDR_RTA_RESOLVE)
+		{
+			const bool is_setup = i == ShaderConvert::HDR_RTA_INIT;
+			VkPipeline(&arr)[2][2] = *(is_setup ? &m_hdr_rta_setup_pipelines : &m_hdr_rta_finish_pipelines);
+			for (u32 ds = 0; ds < 2; ds++)
+			{
+				for (u32 fbl = 0; fbl < 2; fbl++)
+				{
+					pxAssert(!arr[ds][fbl]);
+
+					gpb.SetRenderPass(GetTFXRenderPass(true, ds != 0, is_setup, DATE_RENDER_PASS_NONE, fbl != 0, false,
+										  VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE),
+						0);
+					arr[ds][fbl] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+					if (!arr[ds][fbl])
+						return false;
+
+					Vulkan::SetObjectName(m_device, arr[ds][fbl], "HDR RTA %s/copy pipeline (ds=%u, fbl=%u)",
+						is_setup ? "setup" : "finish", i, ds, fbl);
+				}
+			}
+		}
 	}
 
 	// date image setup
@@ -4584,6 +4606,10 @@ void GSDeviceVK::DestroyResources()
 				vkDestroyPipeline(m_device, m_hdr_setup_pipelines[ds][fbl], nullptr);
 			if (m_hdr_finish_pipelines[ds][fbl] != VK_NULL_HANDLE)
 				vkDestroyPipeline(m_device, m_hdr_finish_pipelines[ds][fbl], nullptr);
+			if (m_hdr_rta_setup_pipelines[ds][fbl] != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, m_hdr_rta_setup_pipelines[ds][fbl], nullptr);
+			if (m_hdr_rta_finish_pipelines[ds][fbl] != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, m_hdr_rta_finish_pipelines[ds][fbl], nullptr);
 		}
 	}
 	for (u32 ds = 0; ds < 2; ds++)
@@ -5760,7 +5786,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	if (hdr_rt && config.rt->GetState() == GSTexture::State::Dirty)
 	{
 		SetUtilityTexture(static_cast<GSTextureVK*>(config.rt), m_point_sampler);
-		SetPipeline(m_hdr_setup_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()]);
+		SetPipeline(pipe.ps.hdr == 2 ? m_hdr_rta_setup_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()] : m_hdr_setup_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()]);
 
 		const GSVector4 drawareaf = GSVector4(config.drawarea);
 		const GSVector4 sRect(drawareaf / GSVector4(rtsize).xyxy());
@@ -5854,7 +5880,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 
 		const GSVector4 drawareaf = GSVector4(config.drawarea);
 		const GSVector4 sRect(drawareaf / GSVector4(rtsize).xyxy());
-		SetPipeline(m_hdr_finish_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()]);
+		SetPipeline(pipe.ps.hdr == 2 ? m_hdr_rta_finish_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()] : m_hdr_finish_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()]);
 		SetUtilityTexture(hdr_rt, m_point_sampler);
 		DrawStretchRect(sRect, drawareaf, rtsize);
 		g_perfmon.Put(GSPerfMon::TextureCopies, 1);

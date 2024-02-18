@@ -4035,6 +4035,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 	// Color clip
 	if (COLCLAMP.CLAMP == 0)
 	{
+		const bool hdr_rta = m_conf.ps.blend_c == 1 && !m_cached_ctx.TEST.DATE && !blend_ad_alpha_masked && rt_alpha_max <= 128;
 		bool free_colclip = false;
 		if (features.framebuffer_fetch)
 			free_colclip = true;
@@ -4071,6 +4072,11 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 			// A slow algo that could requires several passes (barely used)
 			GL_INS("COLCLIP SW mode ENABLED");
 			m_conf.ps.colclip = 1;
+		}
+		else if (hdr_rta)
+		{
+			GL_INS("COLCLIP HDR RTA mode ENABLED");
+			m_conf.ps.hdr = 2;
 		}
 		else
 		{
@@ -4288,7 +4294,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 
 			m_conf.ps.blend_hw = 2;
 		}
-		else if (blend_flag & BLEND_HW_CLR3)
+		else if (m_conf.ps.hdr != 2 && blend_flag & BLEND_HW_CLR3)
 		{
 			m_conf.ps.blend_hw = 3;
 		}

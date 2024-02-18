@@ -129,6 +129,22 @@ PS_OUTPUT ps_hdr_resolve(PS_INPUT input)
 	return output;
 }
 
+PS_OUTPUT ps_hdr_rta_init(PS_INPUT input)
+{
+	PS_OUTPUT output;
+	float4 value = sample_c(input.t);
+	output.c = float4(round(value.rgb * 255) / 65535, trunc(value.a * 255 + 0.1) / 128);
+	return output;
+}
+
+PS_OUTPUT ps_hdr_rta_resolve(PS_INPUT input)
+{
+	PS_OUTPUT output;
+	float4 value = sample_c(input.t);
+	output.c = float4(float3(uint3(value.rgb * 65535.5) & 255) / 255, (value.a * 128) / 255);
+	return output;
+}
+
 uint ps_convert_float32_32bits(PS_INPUT input) : SV_Target0
 {
 	// Convert a FLOAT32 depth texture into a 32 bits UINT texture

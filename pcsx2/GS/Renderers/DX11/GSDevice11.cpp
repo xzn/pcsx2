@@ -2511,7 +2511,7 @@ void GSDevice11::RenderHW(GSHWDrawConfig& config)
 
 		// Warning: StretchRect must be called before BeginScene otherwise
 		// vertices will be overwritten. Trust me you don't want to do that.
-		StretchRect(config.rt, sRect, hdr_rt, dRect, ShaderConvert::HDR_INIT, false);
+		StretchRect(config.rt, sRect, hdr_rt, dRect, config.ps.hdr == 2 ? ShaderConvert::HDR_RTA_INIT : ShaderConvert::HDR_INIT, false);
 		g_perfmon.Put(GSPerfMon::TextureCopies, 1);
 	}
 
@@ -2660,7 +2660,7 @@ void GSDevice11::RenderHW(GSHWDrawConfig& config)
 		const GSVector2i size = config.rt->GetSize();
 		const GSVector4 dRect(config.drawarea);
 		const GSVector4 sRect = dRect / GSVector4(size.x, size.y).xyxy();
-		StretchRect(hdr_rt, sRect, config.rt, dRect, ShaderConvert::HDR_RESOLVE, false);
+		StretchRect(hdr_rt, sRect, config.rt, dRect, config.ps.hdr == 2 ? ShaderConvert::HDR_RTA_RESOLVE : ShaderConvert::HDR_RESOLVE, false);
 		g_perfmon.Put(GSPerfMon::TextureCopies, 1);
 		Recycle(hdr_rt);
 	}

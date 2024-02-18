@@ -427,6 +427,8 @@ private:
 	std::array<VkPipeline, NUM_INTERLACE_SHADERS> m_interlace{};
 	VkPipeline m_hdr_setup_pipelines[2][2] = {}; // [depth][feedback_loop]
 	VkPipeline m_hdr_finish_pipelines[2][2] = {}; // [depth][feedback_loop]
+	VkPipeline m_hdr_rta_setup_pipelines[2][2] = {}; // [depth][feedback_loop]
+	VkPipeline m_hdr_rta_finish_pipelines[2][2] = {}; // [depth][feedback_loop]
 	VkRenderPass m_date_image_setup_render_passes[2][2] = {}; // [depth][clear]
 	VkPipeline m_date_image_setup_pipelines[2][2] = {}; // [depth][datm]
 	VkPipeline m_fxaa_pipeline = {};

@@ -818,7 +818,7 @@ void ps_color_clamp_wrap(inout float3 C)
 		// In 16 bits format, only 5 bits of color are used. It impacts shadows computation of Castlevania
 		if (PS_DST_FMT == FMT_16 && PS_BLEND_MIX == 0)
 			C = (float3)((int3)C & (int3)0xF8);
-		else if (PS_COLCLIP == 1 || PS_HDR == 1)
+		else if (PS_COLCLIP == 1 || PS_HDR != 0)
 			C = (float3)((int3)C & (int3)0xFF);
 	}
 }
@@ -1069,7 +1069,7 @@ PS_OUTPUT ps_main(PS_INPUT input)
 	ps_fbmask(C, input.p.xy);
 
 #if !PS_NO_COLOR
-	output.c0 = PS_HDR ? float4(C.rgb / 65535.0f, C.a / 255.0f) : C / 255.0f;
+	output.c0 = PS_HDR == 2 ? float4(C.rgb / 65535.0f, C.a / 128.0f) : PS_HDR == 1 ? float4(C.rgb / 65535.0f, C.a / 255.0f) : C / 255.0f;
 #if !PS_NO_COLOR1
 	output.c1 = alpha_blend;
 #endif

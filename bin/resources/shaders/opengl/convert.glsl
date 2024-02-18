@@ -329,6 +329,22 @@ void ps_hdr_resolve()
 }
 #endif
 
+#ifdef ps_hdr_rta_init
+void ps_hdr_rta_init()
+{
+	vec4 value = sample_c();
+	SV_Target0 = vec4(round(value.rgb * 255.0f) / 65535.0f, trunc(value.a * 255 + 0.1) / 128);
+}
+#endif
+
+#ifdef ps_hdr_rta_resolve
+void ps_hdr_rta_resolve()
+{
+	vec4 value = sample_c();
+	SV_Target0 = vec4(vec3(uvec3(value.rgb * 65535.0f) & 255u) / 255.0f, (value.a * 128) / 255);
+}
+#endif
+
 #ifdef ps_convert_clut_4
 uniform uvec3 offset;
 uniform float scale;

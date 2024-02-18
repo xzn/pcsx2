@@ -2476,6 +2476,23 @@ bool GSDevice12::CompileConvertPipelines()
 				D3D12::SetObjectName(arr[ds].get(), TinyString::from_fmt("HDR {}/copy pipeline (ds={})", is_setup ? "setup" : "finish", ds));
 			}
 		}
+		else if (i == ShaderConvert::HDR_RTA_INIT || i == ShaderConvert::HDR_RTA_RESOLVE)
+		{
+			const bool is_setup = i == ShaderConvert::HDR_RTA_INIT;
+			std::array<ComPtr<ID3D12PipelineState>, 2>& arr = is_setup ? m_hdr_rta_setup_pipelines : m_hdr_rta_finish_pipelines;
+			for (u32 ds = 0; ds < 2; ds++)
+			{
+				pxAssert(!arr[ds]);
+
+				gpb.SetRenderTarget(0, is_setup ? DXGI_FORMAT_R16G16B16A16_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM);
+				gpb.SetDepthStencilFormat(ds ? DXGI_FORMAT_D32_FLOAT_S8X24_UINT : DXGI_FORMAT_UNKNOWN);
+				arr[ds] = gpb.Create(m_device.get(), m_shader_cache, false);
+				if (!arr[ds])
+					return false;
+
+				D3D12::SetObjectName(arr[ds].get(), TinyString::from_fmt("HDR RTA {}/copy pipeline (ds={})", is_setup ? "setup" : "finish", ds));
+			}
+		}
 	}
 
 	for (u32 datm = 0; datm < 2; datm++)
@@ -2701,6 +2718,8 @@ void GSDevice12::DestroyResources()
 	m_convert = {};
 	m_hdr_setup_pipelines = {};
 	m_hdr_finish_pipelines = {};
+	m_hdr_rta_setup_pipelines = {};
+	m_hdr_rta_finish_pipelines = {};
 	m_date_image_setup_pipelines = {};
 	m_fxaa_pipeline.reset();
 	m_shadeboost_pipeline.reset();
@@ -3875,7 +3894,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 	if (hdr_rt && config.rt->GetState() == GSTexture::State::Dirty)
 	{
 		SetUtilityTexture(static_cast<GSTexture12*>(config.rt), m_point_sampler_cpu);
-		SetPipeline(m_hdr_setup_pipelines[pipe.ds].get());
+		SetPipeline(config.ps.hdr == 2 ? m_hdr_rta_setup_pipelines[pipe.ds].get() : m_hdr_setup_pipelines[pipe.ds].get());
 
 		const GSVector4 sRect(GSVector4(render_area) / GSVector4(rtsize.x, rtsize.y).xyxy());
 		DrawStretchRect(sRect, GSVector4(render_area), rtsize);
@@ -3954,7 +3973,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 			draw_rt->GetClearColor(), 0.0f, 0);
 
 		const GSVector4 sRect(GSVector4(render_area) / GSVector4(rtsize.x, rtsize.y).xyxy());
-		SetPipeline(m_hdr_finish_pipelines[pipe.ds].get());
+		SetPipeline(config.ps.hdr == 2 ? m_hdr_rta_finish_pipelines[pipe.ds].get() : m_hdr_finish_pipelines[pipe.ds].get());
 		SetUtilityTexture(hdr_rt, m_point_sampler_cpu);
 		DrawStretchRect(sRect, GSVector4(render_area), rtsize);
 		g_perfmon.Put(GSPerfMon::TextureCopies, 1);

@@ -762,7 +762,7 @@ void ps_color_clamp_wrap(inout vec3 C)
 #if PS_DST_FMT == FMT_16 && PS_BLEND_MIX == 0
 	// In 16 bits format, only 5 bits of colors are used. It impacts shadows computation of Castlevania
 	C = vec3(ivec3(C) & ivec3(0xF8));
-#elif PS_COLCLIP == 1 || PS_HDR == 1
+#elif PS_COLCLIP == 1 || PS_HDR != 0
 	C = vec3(ivec3(C) & ivec3(0xFF));
 #endif
 
@@ -1063,7 +1063,9 @@ void ps_main()
 	ps_fbmask(C);
 
 #if !PS_NO_COLOR
-	#if PS_HDR == 1
+	#if PS_HDR == 2
+		SV_Target0 = vec4(C.rgb / 65535.0f, C.a / 128.0f);
+	#elif PS_HDR == 1
 		SV_Target0 = vec4(C.rgb / 65535.0f, C.a / 255.0f);
 	#else
 		SV_Target0 = C / 255.0f;

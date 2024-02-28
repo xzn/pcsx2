@@ -240,14 +240,20 @@ void Vulkan::GraphicsPipelineBuilder::Clear()
 	m_rasterization_state = {};
 	m_rasterization_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	m_rasterization_state.lineWidth = 1.0f;
+	m_rasterization_state.depthClampEnable = VK_TRUE;
 	m_depth_state = {};
 	m_depth_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	m_blend_state = {};
 	m_blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	m_blend_attachments = {};
 
+	m_depth_clip_control_state = {};
+	m_depth_clip_control_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_DEPTH_CLIP_CONTROL_CREATE_INFO_EXT;
+	m_depth_clip_control_state.negativeOneToOne = VK_FALSE;
+
 	m_viewport_state = {};
 	m_viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	Vulkan::AddPointerToChain(&m_viewport_state, &m_depth_clip_control_state);
 	m_viewport = {};
 	m_scissor = {};
 

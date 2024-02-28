@@ -2724,34 +2724,31 @@ void GSTextureCache::ScaleTargetForDisplay(Target* t, const GIFRegTEX0& dispfb, 
 
 float GSTextureCache::ConvertColorToDepth(u32 c, ShaderConvert convert)
 {
-	const float mult = std::exp2(g_gs_device->Features().clip_control ? -32.0f : -24.0f);
 	switch (convert)
 	{
 		case ShaderConvert::RGB5A1_TO_FLOAT16:
-			return static_cast<float>(((c & 0xF8u) >> 3) | (((c >> 8) & 0xF8u) << 2) | (((c >> 16) & 0xF8u) << 7) |
-									  (((c >> 24) & 0x80u) << 8)) *
-				   mult;
+			return pack_depth_float(((c & 0xF8u) >> 3) | (((c >> 8) & 0xF8u) << 2) | (((c >> 16) & 0xF8u) << 7) |
+									(((c >> 24) & 0x80u) << 8));
 
 		case ShaderConvert::RGBA8_TO_FLOAT16:
-			return static_cast<float>(c & 0x0000FFFF) * mult;
+			return pack_depth_float(c & 0x0000FFFF);
 
 		case ShaderConvert::RGBA8_TO_FLOAT24:
-			return static_cast<float>(c & 0x00FFFFFF) * mult;
+			return pack_depth_float(c & 0x00FFFFFF);
 
 		case ShaderConvert::RGBA8_TO_FLOAT32:
 		default:
-			return static_cast<float>(c) * mult;
+			return pack_depth_float(c);
 	}
 }
 
 u32 GSTextureCache::ConvertDepthToColor(float d, ShaderConvert convert)
 {
-	const float mult = std::exp2(g_gs_device->Features().clip_control ? 32.0f : 24.0f);
 	switch (convert)
 	{
 		case ShaderConvert::FLOAT16_TO_RGB5A1:
 		{
-			const u32 cc = static_cast<u32>(d * mult);
+			const u32 cc = unpack_depth_float(d);
 
 			// Truely awful.
 			const GSVector4i vcc = GSVector4i(
@@ -2762,7 +2759,7 @@ u32 GSTextureCache::ConvertDepthToColor(float d, ShaderConvert convert)
 
 		case ShaderConvert::FLOAT32_TO_RGBA8:
 		default:
-			return static_cast<u32>(d * mult);
+			return unpack_depth_float(d);
 	}
 }
 

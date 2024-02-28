@@ -708,6 +708,7 @@ public:
 		bool stencil_buffer       : 1; ///< Supports stencil buffer, and can use for DATE.
 		bool cas_sharpening       : 1; ///< Supports sufficient functionality for contrast adaptive sharpening.
 		bool test_and_sample_depth: 1; ///< Supports concurrently binding the depth-stencil buffer for sampling and depth testing.
+		bool extended_depth       : 1;
 		FeatureSupport()
 		{
 			memset(this, 0, sizeof(*this));
@@ -978,3 +979,60 @@ template <>
 struct std::hash<GSHWDrawConfig::PSSelector> : public GSHWDrawConfig::PSSelectorHash {};
 
 extern std::unique_ptr<GSDevice> g_gs_device;
+
+#define DEPTH_PACK_POS 1
+
+static float pack_depth_float(u32 z)
+{
+	if (g_gs_device->Features().extended_depth)
+	{
+#if DEPTH_PACK_POS
+		z >>= 1;
+		z -= z / (1 << 7);
+		z += 1 << 23;
+		return *reinterpret_cast<float *>(&z);
+#else
+		z += 1 << 31;
+		s32 z_i = s32(z);
+		bool sign = z_i < 0;
+		u32 z_s = u32(sign ? -1 - z_i : z_i);
+		z_s -= z_s / (1 << 7);
+		z_s += 1 << 23;
+		z_s += sign ? 1 << 31 : 0;
+		return *reinterpret_cast<float *>(&z_s);
+#endif
+	}
+	else
+	{
+		const float mult = std::exp2(g_gs_device->Features().clip_control ? -32.0f : -24.0f);
+		return static_cast<float>(z) * mult;
+	}
+}
+
+static u32 unpack_depth_float(float z)
+{
+	if (g_gs_device->Features().extended_depth)
+	{
+#if DEPTH_PACK_POS
+		u32 u = *reinterpret_cast<u32 *>(&z);
+		u -= 1 << 23;
+		u += u / (1 << 7);
+		u <<= 1;
+		return u;
+#else
+		bool sign = z < 0;
+		float z_a = abs(z);
+		u32 u = *reinterpret_cast<u32 *>(&z_a);
+		u -= 1 << 23;
+		u += u / (1 << 7);
+		u = sign ? u32(-1 - s32(u)) : u;
+		u -= 1 << 31;
+		return u;
+#endif
+	}
+	else
+	{
+		const float mult = std::exp2(g_gs_device->Features().clip_control ? 32.0f : 24.0f);
+		return static_cast<u32>(z * mult);
+	}
+}

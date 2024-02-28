@@ -157,6 +157,7 @@ namespace Vulkan
 		VkPipelineColorBlendStateCreateInfo m_blend_state;
 		std::array<VkPipelineColorBlendAttachmentState, MAX_ATTACHMENTS> m_blend_attachments;
 
+		VkPipelineViewportDepthClipControlCreateInfoEXT m_depth_clip_control_state;
 		VkPipelineViewportStateCreateInfo m_viewport_state;
 		VkViewport m_viewport;
 		VkRect2D m_scissor;

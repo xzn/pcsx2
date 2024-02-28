@@ -24,6 +24,7 @@
 #include <limits>
 #include <mutex>
 #include <sstream>
+#include <cfloat>
 
 // Tweakables
 enum : u32
@@ -82,6 +83,8 @@ static std::mutex s_instance_mutex;
 static constexpr const char* s_required_device_extensions[] = {
 	VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
 	VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+	VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME,
+	VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME,
 };
 
 GSDeviceVK::GSDeviceVK()
@@ -402,6 +405,7 @@ bool GSDeviceVK::SelectDeviceFeatures()
 	m_device_features.textureCompressionBC = available_features.textureCompressionBC;
 	m_device_features.samplerAnisotropy = available_features.samplerAnisotropy;
 	m_device_features.geometryShader = available_features.geometryShader;
+	m_device_features.depthClamp = available_features.depthClamp;
 
 	return true;
 }
@@ -493,6 +497,11 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	device_info.pNext = nullptr;
 	device_info.flags = 0;
 	device_info.queueCreateInfoCount = 0;
+
+	VkPhysicalDeviceDepthClipControlFeaturesEXT depth_clip_control_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_CONTROL_FEATURES_EXT};
+	depth_clip_control_feature.depthClipControl = VK_TRUE;
+	Vulkan::AddPointerToChain(&device_info, &depth_clip_control_feature);
 
 	static constexpr float queue_priorities[] = {1.0f, 0.0f}; // Low priority for the spin queue
 	std::array<VkDeviceQueueCreateInfo, 3> queue_infos;
@@ -2412,7 +2421,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &rp, VK_SUBPASS_CONTENTS_INLINE);
 
 	const VkViewport vp{0.0f, 0.0f, static_cast<float>(swap_chain_texture->GetWidth()),
-		static_cast<float>(swap_chain_texture->GetHeight()), 0.0f, 1.0f};
+		static_cast<float>(swap_chain_texture->GetHeight()), 0.0f, FLT_MAX};
 	const VkRect2D scissor{
 		{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}};
 	vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &vp);
@@ -2667,10 +2676,16 @@ bool GSDeviceVK::CheckFeatures()
 	// geometryShader is needed because gl_PrimitiveID is part of the Geometry SPIR-V Execution Model.
 	m_features.primitive_id = m_device_features.geometryShader;
 
+	if (!m_device_features.depthClamp)
+	{
+		return false;
+	}
+
 	m_features.prefer_new_textures = true;
 	m_features.provoking_vertex_last = m_optional_extensions.vk_ext_provoking_vertex;
 	m_features.dual_source_blend = m_device_features.dualSrcBlend && !GSConfig.DisableDualSourceBlend;
 	m_features.clip_control = true;
+	m_features.extended_depth = true;
 	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
 
 	if (!m_features.dual_source_blend)
@@ -3545,7 +3560,7 @@ void GSDeviceVK::OMSetRenderTargets(
 
 	// This is used to set/initialize the framebuffer for tfx rendering.
 	const GSVector2i size = vkRt ? vkRt->GetSize() : vkDs->GetSize();
-	const VkViewport vp{0.0f, 0.0f, static_cast<float>(size.x), static_cast<float>(size.y), 0.0f, 1.0f};
+	const VkViewport vp{0.0f, 0.0f, static_cast<float>(size.x), static_cast<float>(size.y), 0.0f, FLT_MAX};
 
 	SetViewport(vp);
 	SetScissor(scissor);

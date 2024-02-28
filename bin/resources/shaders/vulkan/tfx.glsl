@@ -28,7 +28,15 @@ layout(location = 0) out VSOutput
 	#else
 		flat vec4 c;
 	#endif
+
+	float z_hi;
+	float z_lo;
 } vsOut;
+
+float convert_depth_float(uint z)
+{
+	return float(z) * exp2(-32.0f);
+}
 
 #if VS_EXPAND == 0
 
@@ -50,9 +58,8 @@ void main()
 	// input granularity is 1/16 pixel, anything smaller than that won't step drawing up/left by one pixel
 	// example: 133.0625 (133 + 1/16) should start from line 134, ceil(133.0625 - 0.05) still above 133
 
-	gl_Position = vec4(a_p, float(z), 1.0f) - vec4(0.05f, 0.05f, 0, 0);
+	gl_Position = vec4(a_p, convert_depth_float(z), 1.0f) - vec4(0.05f, 0.05f, 0, 0);
 	gl_Position.xy = gl_Position.xy * vec2(VertexScale.x, -VertexScale.y) - vec2(VertexOffset.x, -VertexOffset.y);
-	gl_Position.z *= exp2(-32.0f);		// integer->float depth
 	gl_Position.y = -gl_Position.y;
 
 	#if VS_TME
@@ -84,6 +91,8 @@ void main()
 
 	vsOut.c = vec4(a_c);
 	vsOut.t.z = a_f.r;
+	vsOut.z_hi = float(z / (1 << 16));
+	vsOut.z_lo = float(z % (1 << 16));
 }
 
 #else // VS_EXPAND
@@ -109,6 +118,8 @@ struct ProcessedVertex
 	vec4 t;
 	vec4 ti;
 	vec4 c;
+	float z_hi;
+	float z_lo;
 };
 
 ProcessedVertex load_vertex(uint index)
@@ -127,9 +138,8 @@ ProcessedVertex load_vertex(uint index)
 	ProcessedVertex vtx;
 
 	uint z = min(a_z, MaxDepth);
-	vtx.p = vec4(a_p, float(z), 1.0f) - vec4(0.05f, 0.05f, 0, 0);
+	vtx.p = vec4(a_p, convert_depth_float(z), 1.0f) - vec4(0.05f, 0.05f, 0, 0);
 	vtx.p.xy = vtx.p.xy * vec2(VertexScale.x, -VertexScale.y) - vec2(VertexOffset.x, -VertexOffset.y);
-	vtx.p.z *= exp2(-32.0f);		// integer->float depth
 	vtx.p.y = -vtx.p.y;
 
 	#if VS_TME
@@ -152,6 +162,8 @@ ProcessedVertex load_vertex(uint index)
 
 	vtx.c = a_c;
 	vtx.t.z = a_f.r;
+	vtx.z_hi = float(z / (1 << 16));
+	vtx.z_lo = float(z % (1 << 16));
 
 	return vtx;
 }
@@ -221,6 +233,8 @@ void main()
 	vsOut.t = vtx.t;
 	vsOut.ti = vtx.ti;
 	vsOut.c = vtx.c;
+	vsOut.z_hi = vtx.z_hi;
+	vsOut.z_lo = vtx.z_lo;
 }
 
 #endif // VS_EXPAND
@@ -326,6 +340,8 @@ layout(location = 0) in VSOutput
 	#else
 		flat vec4 c;
 	#endif
+	float z_hi;
+	float z_lo;
 } vsIn;
 
 #if !defined(DISABLE_DUAL_SOURCE) && !PS_NO_COLOR1
@@ -353,6 +369,61 @@ layout(set = 1, binding = 1) uniform texture2D Palette;
 #if PS_DATE > 0
 layout(set = 1, binding = 3) uniform texture2D PrimMinTexture;
 #endif
+
+#define DEPTH_PACK_POS 1
+#define DEPTH_CLAMP_LARGE 0
+
+#define DEPTH_LARGE (uint(-1) - (uint(1) << 31))
+#define DEPTH_MAX (DEPTH_LARGE - DEPTH_LARGE / (1 << 7))
+
+float pack_depth_float(float z, float z_hi)
+{
+	uint z_u = uint(roundEven(z)) + uint(roundEven(z_hi * float(1 << 16)));
+#if DEPTH_PACK_POS
+#if DEPTH_CLAMP_LARGE
+	z_u = min(z_u, DEPTH_MAX - 1);
+	z_u += 1 << 23;
+#else
+	z_u >>= 1;
+	z_u -= z_u / (1 << 7);
+	z_u += 1 << 23;
+#endif
+	return uintBitsToFloat(z_u);
+#else
+	z_u += 1 << 31;
+	int z_i = int(z_u);
+	bool sign = z_i < 0;
+	uint z_s = uint(sign ? -1 - z_i : z_i);
+	z_s -= z_s / (1 << 7);
+	z_s += 1 << 23;
+	z_s += sign ? 1 << 31 : 0;
+	return uintBitsToFloat(z_s);
+#endif
+}
+
+uint unpack_depth_float(float z)
+{
+#if DEPTH_PACK_POS
+#if DEPTH_CLAMP_LARGE
+	uint u = floatBitsToUint(z);
+	u -= 1 << 23;
+#else
+	uint u = floatBitsToUint(z);
+	u -= 1 << 23;
+	u += u / (1 << 7);
+	u <<= 1;
+#endif
+#else
+	bool sign = z < 0;
+	float z_a = abs(z);
+	uint u = floatBitsToUint(z_a);
+	u -= 1 << 23;
+	u += u / (1 << 7);
+	u = sign ? uint(-1 - int(u)) : u;
+	u -= 1 << 31;
+#endif
+	return u;
+}
 
 #if NEEDS_TEX
 
@@ -555,7 +626,7 @@ int fetch_raw_depth(ivec2 xy)
 #else
 	vec4 col = texelFetch(Texture, xy, 0);
 #endif
-	return int(col.r * exp2(32.0f));
+	return int(unpack_depth_float(col.r));
 }
 
 vec4 fetch_raw_color(ivec2 xy)
@@ -663,7 +734,7 @@ vec4 sample_depth(vec2 st, ivec2 pos)
 		// Based on ps_convert_float32_rgba8 of convert
 
 		// Convert a vec32 depth texture into a RGBA color texture
-		uint d = uint(fetch_c(uv).r * exp2(32.0f));
+		uint d = uint(unpack_depth_float(fetch_c(uv).r));
 		t = vec4(uvec4((d & 0xFFu), ((d >> 8) & 0xFFu), ((d >> 16) & 0xFFu), (d >> 24)));
 	}
 	#elif (PS_DEPTH_FMT == 2)
@@ -671,7 +742,7 @@ vec4 sample_depth(vec2 st, ivec2 pos)
 		// Based on ps_convert_float16_rgb5a1 of convert
 
 		// Convert a vec32 (only 16 lsb) depth into a RGB5A1 color texture
-		uint d = uint(fetch_c(uv).r * exp2(32.0f));
+		uint d = uint(unpack_depth_float(fetch_c(uv).r));
 		t = vec4(uvec4((d & 0x1Fu), ((d >> 5) & 0x1Fu), ((d >> 10) & 0x1Fu), (d >> 15) & 0x01u)) * vec4(8.0f, 8.0f, 8.0f, 128.0f);
 	}
 	#elif (PS_DEPTH_FMT == 3)
@@ -1225,6 +1296,8 @@ void main()
 	if(C.a < 128.0f) C.a += 128.0f;
 #endif
 
+	gl_FragDepth = pack_depth_float(vsIn.z_lo, vsIn.z_hi);
+
 	// Get first primitive that will write a failling alpha value
 #if PS_DATE == 1
 
@@ -1241,7 +1314,7 @@ void main()
 #else
 	ps_blend(C, alpha_blend);
 
-#if PS_SHUFFLE
+	#if PS_SHUFFLE
 		#if !PS_SHUFFLE_SAME && !PS_READ16_SRC
 			uvec4 denorm_c_after = uvec4(C);
 			#if PS_READ_BA
@@ -1314,7 +1387,7 @@ void main()
 	#endif
 
 	#if PS_ZCLAMP
-		gl_FragDepth = min(gl_FragCoord.z, MaxDepthPS);
+		gl_FragDepth = min(pack_depth_float(vsIn.z_lo, vsIn.z_hi), MaxDepthPS);
 	#endif
 
 #endif // PS_DATE

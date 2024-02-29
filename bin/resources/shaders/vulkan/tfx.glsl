@@ -29,8 +29,8 @@ layout(location = 0) out VSOutput
 		flat vec4 c;
 	#endif
 
-	float z_hi;
-	float z_lo;
+	noperspective float z_hi;
+	noperspective float z_lo;
 } vsOut;
 
 float convert_depth_float(uint z)
@@ -340,8 +340,8 @@ layout(location = 0) in VSOutput
 	#else
 		flat vec4 c;
 	#endif
-	float z_hi;
-	float z_lo;
+	noperspective float z_hi;
+	noperspective float z_lo;
 } vsIn;
 
 #if !defined(DISABLE_DUAL_SOURCE) && !PS_NO_COLOR1

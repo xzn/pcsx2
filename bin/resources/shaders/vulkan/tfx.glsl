@@ -381,8 +381,12 @@ float pack_depth_float(float z, float z_hi)
 	uint z_u = uint(roundEven(z)) + uint(roundEven(z_hi * float(1 << 16)));
 #if DEPTH_PACK_POS
 #if DEPTH_CLAMP_LARGE
+	if (z_u == 0)
+	{
+		return 0.0f;
+	}
 	z_u = min(z_u, DEPTH_MAX - 1);
-	z_u += 1 << 23;
+	z_u += (1 << 23) - 1;
 #else
 	z_u >>= 1;
 	z_u -= z_u / (1 << 7);
@@ -405,8 +409,12 @@ uint unpack_depth_float(float z)
 {
 #if DEPTH_PACK_POS
 #if DEPTH_CLAMP_LARGE
+	if (z == 0.0f)
+	{
+		return 0;
+	}
 	uint u = floatBitsToUint(z);
-	u -= 1 << 23;
+	u -= (1 << 23) - 1;
 #else
 	uint u = floatBitsToUint(z);
 	u -= 1 << 23;

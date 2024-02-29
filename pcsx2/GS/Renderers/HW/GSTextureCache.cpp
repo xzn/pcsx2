@@ -2727,18 +2727,18 @@ float GSTextureCache::ConvertColorToDepth(u32 c, ShaderConvert convert)
 	switch (convert)
 	{
 		case ShaderConvert::RGB5A1_TO_FLOAT16:
-			return pack_depth_float(((c & 0xF8u) >> 3) | (((c >> 8) & 0xF8u) << 2) | (((c >> 16) & 0xF8u) << 7) |
+			return g_gs_device->PackDepthFloat(((c & 0xF8u) >> 3) | (((c >> 8) & 0xF8u) << 2) | (((c >> 16) & 0xF8u) << 7) |
 									(((c >> 24) & 0x80u) << 8));
 
 		case ShaderConvert::RGBA8_TO_FLOAT16:
-			return pack_depth_float(c & 0x0000FFFF);
+			return g_gs_device->PackDepthFloat(c & 0x0000FFFF);
 
 		case ShaderConvert::RGBA8_TO_FLOAT24:
-			return pack_depth_float(c & 0x00FFFFFF);
+			return g_gs_device->PackDepthFloat(c & 0x00FFFFFF);
 
 		case ShaderConvert::RGBA8_TO_FLOAT32:
 		default:
-			return pack_depth_float(c);
+			return g_gs_device->PackDepthFloat(c);
 	}
 }
 
@@ -2748,7 +2748,7 @@ u32 GSTextureCache::ConvertDepthToColor(float d, ShaderConvert convert)
 	{
 		case ShaderConvert::FLOAT16_TO_RGB5A1:
 		{
-			const u32 cc = unpack_depth_float(d);
+			const u32 cc = g_gs_device->UnpackDepthFloat(d);
 
 			// Truely awful.
 			const GSVector4i vcc = GSVector4i(
@@ -2759,7 +2759,7 @@ u32 GSTextureCache::ConvertDepthToColor(float d, ShaderConvert convert)
 
 		case ShaderConvert::FLOAT32_TO_RGBA8:
 		default:
-			return unpack_depth_float(d);
+			return g_gs_device->UnpackDepthFloat(d);
 	}
 }
 

@@ -372,6 +372,7 @@ layout(set = 1, binding = 3) uniform texture2D PrimMinTexture;
 
 #define DEPTH_PACK_POS 1
 #define DEPTH_CLAMP_LARGE 0
+#define DEPTH_SHIFT_NO_WRAP 0
 
 #define DEPTH_LARGE (uint(-1) - (uint(1) << 31))
 #define DEPTH_MAX (DEPTH_LARGE - DEPTH_LARGE / (1 << 7))
@@ -388,7 +389,11 @@ float pack_depth_float(float z, float z_hi)
 	z_u = min(z_u, DEPTH_MAX - 1);
 	z_u += (1 << 23) - 1;
 #else
+#if DEPTH_SHIFT_NO_WRAP
 	z_u >>= 1;
+#else
+	z_u &= 0x7fffffffu;
+#endif
 	z_u -= z_u / (1 << 7);
 	z_u += (1 << 23) - 1;
 #endif
@@ -419,7 +424,9 @@ uint unpack_depth_float(float z)
 	uint u = floatBitsToUint(z);
 	u -= (1 << 23) - 1;
 	u += u / (1 << 7);
+#if DEPTH_SHIFT_NO_WRAP
 	u <<= 1;
+#endif
 #endif
 #else
 	bool sign = z < 0;

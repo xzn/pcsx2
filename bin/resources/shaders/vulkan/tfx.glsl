@@ -91,8 +91,8 @@ void main()
 
 	vsOut.c = vec4(a_c);
 	vsOut.t.z = a_f.r;
-	vsOut.z_hi = float(z / (1 << 16));
-	vsOut.z_lo = float(z % (1 << 16));
+	vsOut.z_hi = float(z / (1 << 24));
+	vsOut.z_lo = float(z % (1 << 24));
 }
 
 #else // VS_EXPAND
@@ -162,8 +162,8 @@ ProcessedVertex load_vertex(uint index)
 
 	vtx.c = a_c;
 	vtx.t.z = a_f.r;
-	vtx.z_hi = float(z / (1 << 16));
-	vtx.z_lo = float(z % (1 << 16));
+	vtx.z_hi = float(z / (1 << 24));
+	vtx.z_lo = float(z % (1 << 24));
 
 	return vtx;
 }
@@ -379,7 +379,7 @@ layout(set = 1, binding = 3) uniform texture2D PrimMinTexture;
 
 float pack_depth_float(float z, float z_hi)
 {
-	uint z_u = uint(roundEven(z)) + uint(roundEven(z_hi * float(1 << 16)));
+	uint z_u = uint(roundEven(z)) + uint(roundEven(z_hi * float(1 << 24)));
 #if DEPTH_PACK_POS
 	if (z_u == 0)
 	{
